@@ -23,6 +23,19 @@ export interface FaucetStatus {
   page: ProbeResult;
   health: ProbeResult;
   faucetUrl: string;
+  /** Human-readable reason it is down, e.g. "Cannot GET /v1/health/faucet". */
+  reason: string;
+}
+
+/** Pulls the useful part out of an error body, which is usually JSON. */
+export function summarizeProbe(detail: string): string {
+  try {
+    const parsed = JSON.parse(detail) as { message?: string };
+    if (parsed?.message) return parsed.message;
+  } catch {
+    // not JSON
+  }
+  return detail.slice(0, 60);
 }
 
 async function probe(url: string): Promise<ProbeResult> {
@@ -48,7 +61,13 @@ export async function checkFaucetStatus(): Promise<FaucetStatus> {
   // The page will not submit unless health succeeds, so health decides.
   const verdict: FaucetStatus["verdict"] = health.ok ? "up" : "down";
 
-  return { verdict, page, health, faucetUrl: FAUCET_PAGE };
+  return {
+    verdict,
+    page,
+    health,
+    faucetUrl: FAUCET_PAGE,
+    reason: health.ok ? "" : summarizeProbe(health.detail),
+  };
 }
 
 export interface FundOptions {

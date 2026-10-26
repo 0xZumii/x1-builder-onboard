@@ -7,6 +7,7 @@ import { createX1Connection, formatXnt } from "./connection.js";
 import { toolVersion } from "./exec.js";
 import type { RateLimitInfo } from "./fetch.js";
 import { parseRateLimitHeaders } from "./fetch.js";
+import { checkFaucetStatus } from "./faucet.js";
 
 export type CheckStatus = "pass" | "warn" | "fail" | "skip";
 
@@ -318,6 +319,24 @@ export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorRepo
       });
     }
     checks.push(await walletCheck(options.walletPath, connection));
+
+    // Only relevant where someone would actually reach for a faucet.
+    if (cluster.name === "testnet") {
+      const faucet = await checkFaucetStatus();
+      checks.push({
+        id: "faucet",
+        label: "Testnet faucet",
+        status: faucet.verdict === "up" ? "pass" : "warn",
+        detail:
+          faucet.verdict === "up"
+            ? "up"
+            : `down · ${faucet.health.status ?? "unreachable"}${faucet.reason ? ` · ${faucet.reason}` : ""}`,
+        hint:
+          faucet.verdict === "up"
+            ? undefined
+            : "Not your setup. Work locally: x1 localnet --reset, then airdrop there.",
+      });
+    }
   }
 
   const summary = { pass: 0, warn: 0, fail: 0, skip: 0 };

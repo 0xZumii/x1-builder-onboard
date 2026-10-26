@@ -513,6 +513,17 @@ async function copyTemplate(
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+
+  // When run from the monorepo, link the local package instead of asking npm
+  // for a version that has not been published. Keeps `npm run create` working
+  // without an npm account.
+  if (!options.kitPath) {
+    const localKit = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "kit");
+    if (existsSync(path.join(localKit, "package.json"))) {
+      options.kitPath = localKit;
+    }
+  }
+
   const target = path.resolve(options.target);
   const dirName = path.basename(target);
   const pkg = packageName(dirName);
