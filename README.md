@@ -73,11 +73,25 @@ client-side throttling and hides the failure. This kit disables that
 
 ## Install
 
+These packages are **not on npm yet**, so install from the repository:
+
 ```sh
-npm install @x1/kit
+git clone https://github.com/0xZumii/x1-builder-onboard.git
+cd x1-builder-onboard
+npm install
+npm run build
 ```
 
-Requires Node 20+. The Rust/Anchor toolchain is only needed for `x1 deploy`.
+Then either use the CLI directly or scaffold a project:
+
+```sh
+node packages/kit/dist/cli.js doctor
+npm run create -- my-app
+```
+
+Requires Node 20+. The Rust/Anchor toolchain is only needed for builds and
+deploys. They will be published as `@x1/kit` and `create-x1-dapp` once those
+names are claimed on npm.
 
 ## Windows / WSL2
 
@@ -128,6 +142,7 @@ x1 status              Chain info, latency, live rate-limit budget
 x1 deploy              Build, deploy, auto-extend
 x1 localnet            Local validator with X1's programs cloned in
 x1 faucet              Request testnet XNT
+x1 faucet --status     Check whether the faucet is up, without funding
 x1 balance             Show a wallet balance
 ```
 
@@ -160,10 +175,30 @@ solana -u http://127.0.0.1:8899 airdrop 5
 No Docker required. `--no-clone` gives a bare validator; `--port` and `--ledger`
 allow parallel stacks.
 
+## Is the faucet down?
+
+```sh
+x1 faucet --status
+```
+
+This checks the faucet page *and* the health route its own frontend calls before
+it will submit. When it reports `DOWN`, the problem is upstream — which is worth
+knowing before you go looking for a bug in your wallet or your code.
+
+```
+X1 testnet faucet
+
+  verdict   DOWN
+  page      https://faucet.testnet.x1.xyz                200
+  health    https://api.xen.network/v1/health/faucet     404 · Cannot GET /v1/health/faucet
+```
+
+Exit code is 1 when the faucet is down, so it is usable in scripts.
+
 ## Scaffolding a project
 
 ```sh
-npx create-x1-dapp my-app
+npm run create -- my-app     # in this repo, until the packages are published
 cd my-app && npm install
 npm run doctor
 npm run build

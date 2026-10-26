@@ -3,6 +3,54 @@ import { PublicKey as PublicKeyClass } from "@solana/web3.js";
 
 import { CLUSTERS } from "./constants.js";
 
+/** The page users open. */
+const FAUCET_PAGE = "https://faucet.testnet.x1.xyz";
+/**
+ * The endpoint the faucet frontend calls before it will submit. It is not
+ * documented anywhere; it was read out of the page's bundle. That is exactly
+ * why it is worth probing: when it 404s, the page is unusable.
+ */
+const FAUCET_HEALTH = "https://api.xen.network/v1/health/faucet";
+
+export interface ProbeResult {
+  ok: boolean;
+  status: number | null;
+  detail: string;
+}
+
+export interface FaucetStatus {
+  verdict: "up" | "down" | "unknown";
+  page: ProbeResult;
+  health: ProbeResult;
+  faucetUrl: string;
+}
+
+async function probe(url: string): Promise<ProbeResult> {
+  try {
+    const response = await fetch(url, {
+      headers: { accept: "application/json, text/html;q=0.9" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    const body = (await response.text()).slice(0, 300).replace(/\s+/g, " ").trim();
+    return { ok: response.ok, status: response.status, detail: body };
+  } catch (error) {
+    return { ok: false, status: null, detail: (error as Error).message };
+  }
+}
+
+/**
+ * Answers the only question a builder actually has: is this broken for
+ * everyone, or am I doing it wrong?
+ */
+export async function checkFaucetStatus(): Promise<FaucetStatus> {
+  const [page, health] = await Promise.all([probe(FAUCET_PAGE), probe(FAUCET_HEALTH)]);
+
+  // The page will not submit unless health succeeds, so health decides.
+  const verdict: FaucetStatus["verdict"] = health.ok ? "up" : "down";
+
+  return { verdict, page, health, faucetUrl: FAUCET_PAGE };
+}
+
 export interface FundOptions {
   /** Amount in XNT. Default 2. */
   amountXnt?: number;
@@ -67,9 +115,8 @@ export async function fundFromFaucet(
           ? `X1 testnet funding requires the web faucet: ${faucetUrl}\n` +
             `  1. Paste this address: ${pubkey.toBase58()}\n` +
             `  2. Confirm with: x1 balance --address ${pubkey.toBase58()}\n\n` +
-            `  If the faucet shows "Cannot GET /v1/health/faucet", the faucet service\n` +
-            `  itself is down (its frontend checks that route before submitting).\n` +
-            `  Report it in https://t.me/x1_builders rather than retrying.`
+            `  Not sure whether it is you or the faucet? Run: x1 faucet --status\n` +
+            `  If it is down, work locally: x1 localnet --reset, then airdrop there.`
           : `No public faucet is configured for this cluster.`),
     };
   }

@@ -11,7 +11,7 @@ import { createX1Connection, formatXnt, getX1Status } from "./connection.js";
 import { expandHome, loadX1Config } from "./config.js";
 import { deployProgram } from "./deploy.js";
 import { runDoctor, type Check } from "./doctor.js";
-import { fundFromFaucet } from "./faucet.js";
+import { checkFaucetStatus, fundFromFaucet } from "./faucet.js";
 
 const isTty = process.stdout.isTTY && !process.env.NO_COLOR;
 const paint = (code: string) => (text: string) => (isTty ? `\u001b[${code}m${text}\u001b[0m` : text);
@@ -119,6 +119,7 @@ ${bold("COMMANDS")}
 ${bold("OPTIONS")}
   --cluster <name>    mainnet | testnet | localnet | <rpc url>   (default: testnet)
   --keypair <path>    Wallet keypair (default: ~/.config/solana/id.json)
+  --status            faucet: check whether the faucet is up, without funding
   --offline           doctor/status: skip network calls
 
 ${bold("DEPLOY")}
@@ -247,6 +248,47 @@ async function commandDeploy(flags: Record<string, string | boolean>): Promise<n
   return 0;}
 
 async function commandFaucet(flags: Record<string, string | boolean>): Promise<number> {
+  if (flags.status === true) {
+    const status = await checkFaucetStatus();
+    const pretty = (detail: string): string => {
+      try {
+        const parsed = JSON.parse(detail) as { message?: string };
+        if (parsed.message) return parsed.message;
+      } catch {
+        // not JSON, fall through
+      }
+      return detail.slice(0, 60);
+    };
+
+    const show = (result: { ok: boolean; status: number | null; detail: string }) => {
+      if (result.status === null) return `unreachable (${result.detail})`;
+      if (result.ok) return `${result.status}`;
+      const body = result.detail ? ` · ${pretty(result.detail)}` : "";
+      return `${result.status}${body}`;
+    };
+
+    const healthUrl = "https://api.xen.network/v1/health/faucet";
+    console.log(`\n${bold("X1 testnet faucet")}\n`);
+    console.log(`  verdict   ${status.verdict === "up" ? green("UP") : red("DOWN")}`);
+    console.log(`  page      ${status.faucetUrl.padEnd(44)} ${show(status.page)}`);
+    console.log(`  health    ${healthUrl.padEnd(44)} ${show(status.health)}`);
+
+    if (status.verdict === "down") {
+      console.log(
+        `\n  ${yellow("The faucet backend is not serving the route its own frontend requires,")}\n` +
+          `  ${yellow("so the page cannot submit. This is not your wallet or your setup.")}\n`,
+      );
+      console.log(`  Work locally instead:\n`);
+      console.log(`    ${bold("x1 localnet --reset")}                    ${dim("# terminal 1")}`);
+      console.log(`    ${bold("solana -u http://127.0.0.1:8899 airdrop 5")}  ${dim("# terminal 2")}\n`);
+      console.log(`  ${dim("Local clones SPL Token, Token Metadata, Core, Squads v4 and more from mainnet.")}\n`);
+      return 1;
+    }
+
+    console.log(`\n  Faucet looks healthy. Paste your address at ${cyan(status.faucetUrl)}\n`);
+    return 0;
+  }
+
   const walletPath = await walletFromFlags(flags);
   const address =
     typeof flags.address === "string" ? flags.address : await addressFromWallet(walletPath);

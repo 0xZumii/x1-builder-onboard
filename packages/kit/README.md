@@ -125,14 +125,24 @@ entries[0].result; // slot
 ## Faucet
 
 X1 disables `requestAirdrop` on testnet and funds wallets through a browser
-faucet behind reCAPTCHA. This reports that accurately instead of pretending,
-and hands you the address to paste.
+faucet. This reports that accurately instead of pretending, and hands you the
+address to paste.
 
 ```ts
 import { fundFromFaucet } from "@x1/kit";
 
 const result = await fundFromFaucet(connection, pubkey, { amountXnt: 2 });
 if (!result.ok) console.log(result.message); // URL + address + confirm command
+```
+
+Check whether the faucet itself is up before assuming the problem is yours:
+
+```ts
+import { checkFaucetStatus } from "@x1/kit";
+
+const status = await checkFaucetStatus();
+status.verdict; // "up" | "down"
+status.health;  // { ok, status, detail }
 ```
 
 ## Config

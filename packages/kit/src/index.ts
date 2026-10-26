@@ -69,7 +69,14 @@ export {
 
 export { batchRpc, type BatchOptions, type RpcBatchEntry, type RpcCall } from "./batch.js";
 
-export { fundFromFaucet, type FundOptions, type FundResult } from "./faucet.js";
+export {
+  checkFaucetStatus,
+  fundFromFaucet,
+  type FaucetStatus,
+  type FundOptions,
+  type FundResult,
+  type ProbeResult,
+} from "./faucet.js";
 
 export { runDoctor, type Check, type CheckStatus, type DoctorOptions, type DoctorReport } from "./doctor.js";
 
