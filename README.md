@@ -135,12 +135,32 @@ npx x1 doctor
 npx x1 deploy --name my_program
 ```
 
+## Scaffolding a project
+
+```sh
+npx create-x1-dapp my-app
+cd my-app && npm install
+npm run doctor
+npm run build
+npm run deploy
+```
+
+That generates an Anchor program with a program id already derived, an
+`x1.config.ts`, and a deploy script that:
+
+- builds with `--arch v0 --no-idl` (required on solana-cli 4.x),
+- estimates rent and refuses *before* sending anything if the wallet is short,
+- repairs `account data too small` on redeploys by extending and retrying.
+
+Nothing in the template is aspirational — each command is one this repo has run
+against X1.
+
 ## Status
 
 | Phase | What | State |
 | --- | --- | --- |
 | 1 | `@x1/kit` — connection, throttle, deploy, doctor | working, verified on Windows and Linux against live X1 |
-| 2 | `create-x1-dapp` scaffolder | next |
+| 2 | `create-x1-dapp` scaffolder | working, tested end to end in WSL |
 | 3 | Local validator stack (Docker, cloned programs) | research |
 | 4 | Explorer plugin / docs PR | planned |
 
@@ -159,7 +179,7 @@ logic itself is covered by `scripts/test-deploy-recovery.mjs`.
 
 ```
 packages/kit/        @x1/kit and the x1 CLI
-packages/create-x1-dapp/   (phase 2)
+packages/create-x1-dapp/   the scaffolder
 docker/              (phase 3)
 docs/findings.md     measured network behaviour, with repro scripts
 scripts/             setup, provisioning, verification

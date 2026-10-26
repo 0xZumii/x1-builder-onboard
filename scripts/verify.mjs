@@ -4,7 +4,7 @@
  * Unit checks run offline; the live checks hit the public X1 testnet RPC.
  * Run with: node scripts/verify.mjs
  */
-import { Throttle, createX1Connection, batchRpc, parseRateLimitHeaders } from "../packages/kit/dist/index.js";
+import { Throttle, createX1Connection, batchRpc, parseRateLimitHeaders, expandHome } from "../packages/kit/dist/index.js";
 
 let failures = 0;
 
@@ -133,6 +133,15 @@ console.log("\nLive: X1 testnet");
   await connection.getSlot();
   const stats = connection.x1.stats();
   check("explicit concurrency is pinned", stats.limits.maxConcurrent === 3, `${stats.limits.maxConcurrent}`);
+}
+
+{
+  // Tilde expansion: `wallet: "~/.config/solana/id.json"` must not be treated
+  // as relative to the project directory.
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+  const expanded = expandHome("~/.config/solana/id.json");
+  check("expandHome expands ~", expanded.startsWith(home) && !expanded.includes("~"), expanded);
+  check("expandHome leaves absolute paths alone", expandHome("/tmp/x") === "/tmp/x");
 }
 
 {

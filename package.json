@@ -8,11 +8,12 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @x1/kit",
-    "typecheck": "npm run typecheck -w @x1/kit",
+    "build": "npm run build -w @x1/kit && npm run build -w create-x1-dapp",
+    "typecheck": "npm run typecheck -w @x1/kit && npm run typecheck -w create-x1-dapp",
     "verify": "node scripts/verify.mjs",
     "test:recovery": "node scripts/test-deploy-recovery.mjs",
     "x1": "node packages/kit/dist/cli.js",
+    "create": "node packages/create-x1-dapp/dist/index.js",
     "doctor": "node packages/kit/dist/cli.js doctor"
   },
   "engines": {

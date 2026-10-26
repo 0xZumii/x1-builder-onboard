@@ -1,0 +1,24 @@
+{
+  "name": "create-x1-dapp",
+  "version": "0.1.0",
+  "description": "Scaffold an X1 program and app with a deploy path that actually works",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-x1-dapp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -6,7 +6,7 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 
 import { NATIVE_SYMBOL, resolveCluster, type ClusterInput } from "./constants.js";
 import { createX1Connection, formatXnt, getX1Status } from "./connection.js";
-import { loadX1Config } from "./config.js";
+import { expandHome, loadX1Config } from "./config.js";
 import { deployProgram } from "./deploy.js";
 import { runDoctor, type Check } from "./doctor.js";
 import { fundFromFaucet } from "./faucet.js";
@@ -64,8 +64,8 @@ function clusterFromFlags(flags: Record<string, string | boolean>): ClusterInput
 }
 
 async function walletFromFlags(flags: Record<string, string | boolean>): Promise<string | undefined> {
-  if (typeof flags.keypair === "string") return path.resolve(flags.keypair);
-  if (typeof flags.wallet === "string") return path.resolve(flags.wallet);
+  if (typeof flags.keypair === "string") return path.resolve(expandHome(flags.keypair));
+  if (typeof flags.wallet === "string") return path.resolve(expandHome(flags.wallet));
 
   try {
     const config = await loadX1Config();
@@ -214,8 +214,10 @@ async function commandDeploy(flags: Record<string, string | boolean>): Promise<n
     walletPath,
     programId: typeof flags["program-id"] === "string" ? flags["program-id"] : undefined,
     programKeypairPath:
-      typeof flags["program-keypair"] === "string" ? path.resolve(flags["program-keypair"]) : undefined,
-    soPath: typeof flags.so === "string" ? path.resolve(flags.so) : undefined,
+      typeof flags["program-keypair"] === "string"
+        ? path.resolve(expandHome(flags["program-keypair"]))
+        : undefined,
+    soPath: typeof flags.so === "string" ? path.resolve(expandHome(flags.so)) : undefined,
     programName: typeof flags.name === "string" ? flags.name : undefined,
     build: flags["no-build"] === true ? false : flags.build === true ? true : undefined,
     extendBy: typeof flags["extend-by"] === "string" ? Number(flags["extend-by"]) : undefined,

@@ -43,6 +43,7 @@ export {
 
 export {
   defineConfig,
+  expandHome,
   findConfigFile,
   loadX1Config,
   type ResolvedX1Config,

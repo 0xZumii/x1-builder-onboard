@@ -1,4 +1,5 @@
 import { access } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -114,9 +115,23 @@ async function readConfigFile(file: string): Promise<X1Config> {
   }
 }
 
+/**
+ * Expands a leading `~` to the home directory.
+ *
+ * `path.resolve` does not understand `~`, so `wallet: "~/.config/solana/id.json"`
+ * would silently become `<project>/~/.config/...` — which then fails with a
+ * confusing "cannot read" error.
+ */
+export function expandHome(input: string): string {
+  if (input === "~") return os.homedir();
+  if (input.startsWith("~/") || input.startsWith("~\\")) {
+    return path.join(os.homedir(), input.slice(2));
+  }
+  return input;
+}
+
 function defaultSolanaKeypair(): string {
-  const home = process.env.HOME ?? process.env.USERPROFILE ?? ".";
-  return path.join(home, ".config", "solana", "id.json");
+  return path.join(os.homedir(), ".config", "solana", "id.json");
 }
 
 /**
@@ -131,7 +146,7 @@ export async function loadX1Config(options: { from?: string; config?: X1Config; 
   const cluster = resolveCluster(merged.cluster ?? DEFAULT_CLUSTER);
 
   const resolvePath = (value: string | undefined, fallback: string): string =>
-    value ? path.resolve(rootDir, value) : fallback;
+    value ? path.resolve(rootDir, expandHome(value)) : fallback;
 
   return {
     configPath,
@@ -141,8 +156,8 @@ export async function loadX1Config(options: { from?: string; config?: X1Config; 
     program: {
       name: merged.program?.name,
       programId: merged.program?.programId,
-      keypairPath: merged.program?.keypair ? path.resolve(rootDir, merged.program.keypair) : undefined,
-      soPath: merged.program?.soPath ? path.resolve(rootDir, merged.program.soPath) : undefined,
+      keypairPath: merged.program?.keypair ? path.resolve(rootDir, expandHome(merged.program.keypair)) : undefined,
+      soPath: merged.program?.soPath ? path.resolve(rootDir, expandHome(merged.program.soPath)) : undefined,
     },
     limits: merged.limits ?? {},
     priorityFee: merged.priorityFee,
