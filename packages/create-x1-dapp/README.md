@@ -16,12 +16,20 @@ npm run deploy
 my-app/
   Anchor.toml                 program id already wired up
   Cargo.toml                  workspace + release profile
-  package.json                build / deploy / doctor scripts
+  package.json                build / deploy / doctor / dev scripts
   x1.config.ts                cluster, wallet, program settings
   programs/my_app/src/lib.rs  a counter, ready to change
   scripts/deploy.mjs          deploy entry point
+  scripts/idl.mjs             IDL generation that creates target/idl first
+  vite.config.js              web build (node polyfills for web3.js)
+  web/index.html, web/main.js wallet connect + call the program
   target/deploy/…-keypair.json  the program keypair (upgrade authority)
 ```
+
+The browser talks to the wallet through whichever global the extension
+injects (`window.x1`, `window.backpack`, `window.solana`) and encodes Anchor
+instructions by hand, so the page has no Anchor client dependency. The
+discriminators are verified against Anchor's own IDL output.
 
 The program id is generated at scaffold time and written into both
 `declare_id!` and the keypair file, so the project is deployable without any
@@ -41,10 +49,22 @@ from the official docs:
 | Cryptic rent failures | deploy estimates cost and refuses before sending |
 | Redeploy needs 2x rent (buffer account) | pre-flight reports it in XNT, not lamports |
 
+## Templates
+
+`--template web` (the default) adds a Vite app in `web/` that connects a wallet
+and calls the program: connect, initialize, increment, read the count.
+
+`--template basic` is the program and deploy script only.
+
+The web app defaults to `http://127.0.0.1:8899` on purpose — run `x1 localnet`
+in another terminal, where airdrops work, instead of fighting the testnet
+faucet. Point it elsewhere with `VITE_X1_RPC=https://rpc.testnet.x1.xyz`.
+
 ## Options
 
 ```
 --cluster <name>    testnet (default) | mainnet | <rpc url>
+--template <name>   web (default) | basic
 --kit-path <path>   Use a local @x1/kit checkout (monorepo root or the package)
 --force, -f         Write into a non-empty directory
 ```

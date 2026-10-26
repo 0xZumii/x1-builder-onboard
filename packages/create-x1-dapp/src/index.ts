@@ -7,8 +7,9 @@
  * solana-cli 4.x. Every footgun documented in docs/findings.md is pre-handled.
  */
 import { existsSync } from "node:fs";
-import { access, mkdir, readdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { Keypair } from "@solana/web3.js";
 
@@ -28,6 +29,7 @@ const CLUSTERS: Record<string, string> = {
 interface Options {
   target: string;
   cluster: string;
+  template: "web" | "basic";
   kitPath?: string;
   force: boolean;
 }
@@ -40,6 +42,7 @@ function fail(message: string): never {
 function parseArgs(argv: string[]): Options {
   const positional: string[] = [];
   let cluster = "testnet";
+  let template: "web" | "basic" = "web";
   let kitPath: string | undefined;
   let force = false;
 
@@ -50,6 +53,10 @@ function parseArgs(argv: string[]): Options {
       cluster = argv[++i] ?? cluster;
     } else if (arg.startsWith("--cluster=")) {
       cluster = arg.slice("--cluster=".length);
+    } else if (arg === "--template") {
+      template = (argv[++i] ?? template) as "web" | "basic";
+    } else if (arg.startsWith("--template=")) {
+      template = arg.slice("--template=".length) as "web" | "basic";
     } else if (arg === "--kit-path") {
       kitPath = argv[++i];
       if (!kitPath) fail("--kit-path needs a value");
@@ -76,7 +83,11 @@ function parseArgs(argv: string[]): Options {
     fail(`unknown cluster "${cluster}". Use testnet, mainnet, or an RPC URL.`);
   }
 
-  return { target: positional[0], cluster, kitPath, force };
+  if (template !== "web" && template !== "basic") {
+    fail(`unknown template "${template}". Use web or basic.`);
+  }
+
+  return { target: positional[0], cluster, template, kitPath, force };
 }
 
 function usage(): void {
@@ -87,6 +98,7 @@ ${bold("USAGE")}
   create-x1-dapp <dir> [options]
 
 ${bold("OPTIONS")}
+  --template <name>   web (default) | basic
   --cluster <name>    testnet (default) | mainnet | <rpc url>
   --kit-path <path>   Use a local @x1/kit checkout instead of the npm version
   --force, -f         Write into a non-empty directory
@@ -253,28 +265,42 @@ const programSource = (program: string, id: string): string =>
     "",
   ].join("\n");
 
-const packageJson = (pkg: string, kitDep: string): string =>
-  JSON.stringify(
-    {
-      name: pkg,
-      version: "0.1.0",
-      private: true,
-      type: "module",
-      scripts: {
-        // --arch v0: solana-cli 4.x defaults to SBPFv3 and then rejects it with
-        // its own platform-tools. --no-idl: anchor otherwise forwards --arch
-        // into its IDL step, where cargo test rejects it.
-        build: "anchor build --no-idl -- --arch v0",
-        idl: "anchor idl build",
-        deploy: "node scripts/deploy.mjs",
-        doctor: "x1 doctor",
-        status: "x1 status",
-      },
-      dependencies: { "@x1/kit": kitDep },
-    },
-    null,
-    2,
-  ) + "\n";
+const packageJson = (pkg: string, kitDep: string, template: "web" | "basic"): string => {
+  const scripts: Record<string, string> = {
+    // --arch v0: solana-cli 4.x defaults to SBPFv3 and then rejects it with
+    // its own platform-tools. --no-idl: anchor otherwise forwards --arch
+    // into its IDL step, where cargo test rejects it.
+    build: "anchor build --no-idl -- --arch v0",
+    idl: "node scripts/idl.mjs",
+    deploy: "node scripts/deploy.mjs",
+    doctor: "x1 doctor",
+    status: "x1 status",
+  };
+  const dependencies: Record<string, string> = { "@x1/kit": kitDep };
+  const devDependencies: Record<string, string> = {};
+
+  if (template === "web") {
+    scripts.dev = "vite";
+    scripts["build:web"] = "vite build";
+    scripts.preview = "vite preview";
+    // Pinned to the 1.x line to match @x1/kit; 3.x changed the API.
+    dependencies["@solana/web3.js"] = "^1.98.0";
+    devDependencies.vite = "^8.0.0";
+    devDependencies["vite-plugin-node-polyfills"] = "^0.28.0";
+  }
+
+  const manifest = {
+    name: pkg,
+    version: "0.1.0",
+    private: true,
+    type: "module",
+    scripts,
+    dependencies,
+    ...(Object.keys(devDependencies).length > 0 ? { devDependencies } : {}),
+  };
+
+  return JSON.stringify(manifest, null, 2) + "\n";
+};
 
 const x1Config = (program: string): string =>
   [
@@ -291,8 +317,7 @@ const x1Config = (program: string): string =>
     "",
   ].join("\n");
 
-const deployScript = (program: string): string =>
-  [
+const deployScript = (program: string): string =>  [
     "// Deploys the program to X1. Handles build flags, rent estimation and the",
     "// `account data too small` repair automatically.",
     'import { createX1Connection, deployProgram, loadX1Config } from "@x1/kit";',
@@ -323,10 +348,32 @@ const deployScript = (program: string): string =>
     "",
   ].join("\n");
 
-const gitignore = (): string =>
-  ["node_modules/", "target/", ".anchor/", "dist/", "test-ledger/", ".env", ""].join("\n");
+/**
+ * `anchor idl build --out` fails silently (exit 0, "No such file or directory")
+ * when target/idl does not exist. Create it first.
+ */
+const idlScript = (program: string): string =>
+  [
+    "// Generates target/idl/<program>.json.",
+    'import { mkdirSync } from "node:fs";',
+    'import { spawnSync } from "node:child_process";',
+    'import path from "node:path";',
+    "",
+    `const program = "${program}";`,
+    'const out = path.join("target", "idl", `${program}.json`);',
+    "",
+    "mkdirSync(path.dirname(out), { recursive: true });",
+    "",
+    'const result = spawnSync("anchor", ["idl", "build", "--out", out], { stdio: "inherit" });',
+    "if (result.status !== 0) process.exit(result.status ?? 1);",
+    "",
+    "console.log(`\\n  idl written to ${out}\\n`);",
+    "",
+  ].join("\n");
 
-const readme = (title: string, program: string, cluster: string): string =>
+const gitignore = (): string =>  ["node_modules/", "target/", ".anchor/", "dist/", "test-ledger/", ".env", ""].join("\n");
+
+const readme = (title: string, program: string, cluster: string, template: "web" | "basic"): string =>
   [
     `# ${title}`,
     "",
@@ -381,6 +428,29 @@ const readme = (title: string, program: string, cluster: string): string =>
     "> the CLI stages the new binary in a buffer account, which is refunded on",
     "> success. A first deploy only needs 1x.",
     "",
+    ...(template === "web"
+      ? [
+          "## Web UI",
+          "",
+          "```sh",
+          "npm run dev",
+          "```",
+          "",
+          "Connects a wallet and calls the program from the browser. It expects a",
+          "local validator: run `x1 localnet` in another terminal. Airdrops work",
+          "locally, so the testnet faucet being down does not block you.",
+          "",
+          "Point it elsewhere with:",
+          "",
+          "```sh",
+          "VITE_X1_RPC=https://rpc.testnet.x1.xyz npm run dev",
+          "```",
+          "",
+          "The UI talks to the wallet through `window.x1`, `window.backpack` or",
+          "`window.solana`, whichever the extension injects.",
+          "",
+        ]
+      : []),
     "## Layout",
     "",
     "```",
@@ -400,6 +470,46 @@ const readme = (title: string, program: string, cluster: string): string =>
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+
+const TEMPLATES_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "templates",
+);
+
+async function listFiles(dir: string, base = dir): Promise<string[]> {
+  const files: string[] = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...(await listFiles(full, base)));
+    else files.push(path.relative(base, full));
+  }
+  return files;
+}
+
+/**
+ * Copies a template directory into the target, replacing __TOKENS__.
+ * Paths are mirrored exactly, so `templates/web/web/index.html` lands at
+ * `<project>/web/index.html`.
+ */
+async function copyTemplate(
+  template: string,
+  target: string,
+  replacements: Record<string, string>,
+): Promise<void> {
+  const root = path.join(TEMPLATES_ROOT, template);
+  if (!existsSync(root)) return;
+
+  for (const relative of await listFiles(root)) {
+    let contents = await readFile(path.join(root, relative), "utf8");
+    for (const [token, value] of Object.entries(replacements)) {
+      contents = contents.split(token).join(value);
+    }
+    const file = path.join(target, relative);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, contents, "utf8");
+  }
+}
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
@@ -421,11 +531,12 @@ async function main(): Promise<void> {
   const files: Record<string, string> = {
     "Anchor.toml": anchorToml(program, programId, rpc),
     "Cargo.toml": workspaceCargo(),
-    "package.json": packageJson(pkg, kitDep),
+    "package.json": packageJson(pkg, kitDep, options.template),
     "x1.config.ts": x1Config(program),
-    "README.md": readme(pkg, program, clusterLabel),
+    "README.md": readme(pkg, program, clusterLabel, options.template),
     ".gitignore": gitignore(),
     "scripts/deploy.mjs": deployScript(program),
+    "scripts/idl.mjs": idlScript(program),
     [`programs/${program}/Cargo.toml`]: programCargo(program),
     [`programs/${program}/src/lib.rs`]: programSource(program, programId),
     [`target/deploy/${program}-keypair.json`]: JSON.stringify(Array.from(keypair.secretKey)),
@@ -437,22 +548,39 @@ async function main(): Promise<void> {
     await writeFile(file, contents, "utf8");
   }
 
+  if (options.template === "web") {
+    await copyTemplate("web", target, {
+      __PROGRAM_ID__: programId,
+      __PROGRAM__: program,
+      __PACKAGE__: pkg,
+    });
+  }
+
   console.log(`
 ${green("✓")} Created ${bold(pkg)} in ${dim(target)}
 
   program id   ${cyan(programId)}
   module       ${program}
+  template     ${options.template}
   cluster      ${clusterLabel} ${dim(rpc)}
 
 ${bold("Next")}
   ${dim("$")} cd ${options.target}
   ${dim("$")} npm install
   ${dim("$")} npm run doctor
-  ${dim("$")} npm run build
+  ${dim("$")} npm run build${
+    options.template === "web"
+      ? `\n  ${dim("$")} npm run dev          ${dim("# web UI against http://127.0.0.1:8899")}`
+      : ""
+  }
   ${dim("$")} npm run deploy
 
   ${dim(`Program keypair: target/deploy/${program}-keypair.json (keep it — it is the upgrade authority)`)}
-`);
+  ${
+    options.template === "web"
+      ? dim("Web UI expects a local validator: run `x1 localnet` in another terminal.\n")
+      : ""
+  }`);
 }
 
 main().catch((error: unknown) => {

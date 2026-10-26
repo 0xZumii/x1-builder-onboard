@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>__PACKAGE__ · X1</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0d12;
+        --panel: #141821;
+        --line: #232936;
+        --text: #e6e9ef;
+        --muted: #8b93a5;
+        --accent: #5b8cff;
+        --ok: #3ecf8e;
+        --bad: #ff6b6b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+        padding: 24px;
+      }
+      main {
+        width: 100%;
+        max-width: 520px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 24px;
+      }
+      h1 { margin: 0 0 4px; font-size: 20px; }
+      p.sub { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; }
+      button {
+        flex: 1;
+        min-width: 130px;
+        padding: 11px 14px;
+        border-radius: 9px;
+        border: 1px solid var(--line);
+        background: #1b2030;
+        color: var(--text);
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) { border-color: var(--accent); }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #0b0d12; font-weight: 600; }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+      dl { display: grid; grid-template-columns: 90px 1fr; gap: 6px 12px; margin: 20px 0 0; font-size: 13px; }
+      dt { color: var(--muted); }
+      dd { margin: 0; word-break: break-all; font-family: ui-monospace, monospace; }
+      #count { font-size: 34px; font-weight: 700; margin: 20px 0 0; }
+      #log {
+        margin-top: 18px;
+        max-height: 150px;
+        overflow: auto;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        color: var(--muted);
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+        white-space: pre-wrap;
+      }
+      .ok { color: var(--ok); }
+      .bad { color: var(--bad); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>__PACKAGE__</h1>
+      <p class="sub">X1 program <code>__PROGRAM__</code> · <span id="rpc"></span></p>
+
+      <div class="row">
+        <button id="connect" class="primary">Connect wallet</button>
+        <button id="refresh" disabled>Refresh</button>
+      </div>
+
+      <div id="count">—</div>
+
+      <div class="row" style="margin-top: 14px">
+        <button id="initialize" disabled>Initialize</button>
+        <button id="increment" disabled>Increment</button>
+      </div>
+
+      <dl>
+        <dt>wallet</dt><dd id="wallet">not connected</dd>
+        <dt>counter</dt><dd id="account">not created</dd>
+      </dl>
+
+      <div id="log"></div>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

@@ -167,11 +167,12 @@ npx create-x1-dapp my-app
 cd my-app && npm install
 npm run doctor
 npm run build
+npm run dev        # web UI, against a local validator
 npm run deploy
 ```
 
 That generates an Anchor program with a program id already derived, an
-`x1.config.ts`, and a deploy script that:
+`x1.config.ts`, a Vite web app, and a deploy script that:
 
 - builds with `--arch v0 --no-idl` (required on solana-cli 4.x),
 - estimates rent and refuses *before* sending anything if the wallet is short,
