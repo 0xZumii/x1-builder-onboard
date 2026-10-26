@@ -204,13 +204,21 @@ npm run deploy
 
 ### Funding
 
-- **Local** — already funded in step 3. `npm run deploy -- --cluster localnet`
-  if you want to deploy locally first.
-- **Testnet** — `x1 faucet --status` first. If it says `DOWN`, it is an upstream
-  outage, not you; keep working locally.
-- **Mainnet** — real XNT. Note that *redeploying* an already-deployed program
-  needs about **twice** the rent available, because the CLI stages the new
-  binary in a buffer account that is refunded on success.
+```sh
+x1 funds
+```
+
+shows your XNT balance, what the deploy in front of you needs, and how much you
+are short.
+
+- **Local** — already funded in step 3. Use
+  `npm run deploy -- --cluster localnet` to practise the whole flow for free.
+- **Testnet** — run `x1 faucet --status` first. If it says `DOWN` it is an
+  upstream outage, not you; keep working locally.
+- **Mainnet** — real XNT. The route is **USDC → [bridge](https://app.bridge.x1.xyz/)
+  → USDC.X → [swap](https://app.xdex.xyz/swap) → XNT**; SOL cannot be bridged
+  directly. Full details, amounts and warnings in
+  [`funding.md`](funding.md).
 
 ---
 

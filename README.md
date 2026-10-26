@@ -147,6 +147,7 @@ x1 deploy              Build, deploy, auto-extend
 x1 localnet            Local validator with X1's programs cloned in
 x1 faucet              Request testnet XNT
 x1 faucet --status     Check whether the faucet is up, without funding
+x1 funds               XNT balance, deploy cost, and how to top up
 x1 balance             Show a wallet balance
 ```
 
@@ -249,6 +250,7 @@ packages/create-x1-dapp/   the scaffolder
 docker/              (phase 3)
 docs/findings.md     measured network behaviour, with repro scripts
 docs/onboarding.md   zero to first deploy, with expected output at each step
+docs/funding.md      getting XNT onto X1 (bridge + swap), and what it costs
 scripts/             setup, provisioning, verification
   setup.ps1          Windows: WSL2 + distro, then delegates
   wsl-provision.sh   Linux toolchain (rust, solana, anchor, node)

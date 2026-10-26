@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -9,7 +9,13 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { CLUSTERS, LOCALNET_PROGRAMS, NATIVE_SYMBOL, resolveCluster, type ClusterInput } from "./constants.js";
 import { createX1Connection, formatXnt, getX1Status } from "./connection.js";
 import { expandHome, loadX1Config } from "./config.js";
-import { deployProgram } from "./deploy.js";
+import {
+  deployProgram,
+  estimateDeployCost,
+  findProgramKeypair,
+  findProgramSo,
+  programIdFromKeypair,
+} from "./deploy.js";
 import { runDoctor, type Check } from "./doctor.js";
 import { checkFaucetStatus, fundFromFaucet } from "./faucet.js";
 
@@ -113,6 +119,7 @@ ${bold("COMMANDS")}
   deploy              Build, deploy, and auto-extend the program account
   localnet            Run a local validator with X1's programs cloned in
   faucet              Request testnet ${NATIVE_SYMBOL}
+  funds               XNT balance, what a deploy needs, and how to top up
   balance             Show the balance of a wallet
   help                Show this message
 
@@ -315,6 +322,74 @@ async function commandFaucet(flags: Record<string, string | boolean>): Promise<n
   return result.ok ? 0 : 1;
 }
 
+async function commandFunds(flags: Record<string, string | boolean>): Promise<number> {
+  const cluster = resolveCluster(clusterFromFlags(flags));
+  const walletPath = await walletFromFlags(flags);
+  const address =
+    typeof flags.address === "string" ? flags.address : await addressFromWallet(walletPath);
+
+  if (!address) {
+    console.error(red("No address. Pass --address or --keypair."));
+    return 1;
+  }
+
+  const connection = createX1Connection({ cluster });
+  const lamports = await connection.getBalance(new PublicKey(address));
+
+  console.log(`\n${bold("X1 funds")} ${dim(cluster.name)}\n`);
+  console.log(`  wallet   ${address}`);
+  console.log(`  XNT      ${bold(formatXnt(lamports))}`);
+
+  // If run inside a project with a built program, price the deploy it would do.
+  let required: number | null = null;
+  let label = "";
+
+  try {
+    const config = await loadX1Config();
+    const soPath = await findProgramSo(config.targetDir, config.program.name);
+
+    if (soPath) {
+      const bytes = (await stat(soPath)).size;
+      const name = config.program.name ?? path.basename(soPath, ".so");
+      const keypairPath =
+        config.program.keypairPath ?? (await findProgramKeypair(config.targetDir, name)) ?? undefined;
+
+      const programId =
+        config.program.programId ??
+        (keypairPath ? await programIdFromKeypair(keypairPath) : undefined);
+
+      if (programId) {
+        const estimate = await estimateDeployCost(connection, programId, bytes);
+        required = estimate.requiredLamports;
+        label = `${estimate.isUpgrade ? "upgrade" : "deploy"} · ${bytes} bytes`;
+      }
+    }
+  } catch {
+    // Not in a project, or the RPC is unreachable. The generic advice still helps.
+  }
+
+  if (required !== null) {
+    console.log(`  ${label}`);
+    console.log(`  needs    ${formatXnt(required)}`);
+    const shortfall = required - lamports;
+    console.log(
+      shortfall > 0
+        ? `  ${yellow("short")}    ${formatXnt(shortfall)}`
+        : `  ${green("ok")}       enough for this deploy`,
+    );
+  } else {
+    console.log(`  ${dim("a ~180KB program needs ~1.2 XNT of rent to deploy")}`);
+  }
+
+  console.log(`\n  ${dim("Top up XNT:")}`);
+  console.log(`    bridge   ${cyan("https://app.bridge.x1.xyz/")}   ${dim("USDC on Solana → USDC.X")}`);
+  console.log(`    swap     ${cyan("https://app.xdex.xyz/swap")}    ${dim("USDC.X → XNT")}`);
+  console.log(`    wallet   ${cyan("https://wallet.x1.xyz")}        ${dim("bridge and swap in one app")}`);
+  console.log(`\n  ${dim("SOL cannot be bridged directly — convert it to USDC first.")}\n`);
+
+  return 0;
+}
+
 async function commandBalance(flags: Record<string, string | boolean>): Promise<number> {
   const walletPath = await walletFromFlags(flags);
   const address =
@@ -387,6 +462,8 @@ async function main(): Promise<number> {
         return await commandDeploy(flags);
       case "faucet":
         return await commandFaucet(flags);
+      case "funds":
+        return await commandFunds(flags);
       case "balance":
         return await commandBalance(flags);
       case "localnet":
