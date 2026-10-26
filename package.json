@@ -1,0 +1,25 @@
+{
+  "name": "x1-devkit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Developer toolkit for the X1 SVM blockchain",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @x1/kit",
+    "typecheck": "npm run typecheck -w @x1/kit",
+    "verify": "node scripts/verify.mjs",
+    "test:recovery": "node scripts/test-deploy-recovery.mjs",
+    "x1": "node packages/kit/dist/cli.js",
+    "doctor": "node packages/kit/dist/cli.js doctor"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.3"
+  }
+}

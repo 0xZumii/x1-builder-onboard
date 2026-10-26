@@ -1,0 +1,33 @@
+{
+  "name": "@x1/kit",
+  "version": "0.1.0",
+  "description": "Rate-limit-aware connection, deploy and diagnostics helpers for the X1 SVM blockchain",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "x1": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "watch": "tsc -p tsconfig.json --watch"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
