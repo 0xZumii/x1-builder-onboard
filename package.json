@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Developer toolkit for the X1 SVM blockchain",
+  "license": "MIT",
   "type": "module",
   "workspaces": [
     "packages/*"

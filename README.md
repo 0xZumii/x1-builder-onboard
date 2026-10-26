@@ -218,3 +218,7 @@ scripts/             setup, provisioning, verification
 
 `node scripts/verify.mjs` runs the offline unit checks plus live checks against
 the X1 testnet.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
