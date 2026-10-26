@@ -179,6 +179,24 @@ Error: Not enough XNT to upgrade.
   required: 2.3857 XNT = 1.1928 XNT rent + 1.1928 XNT buffer (refunded on success)
 ```
 
+### X1 does support ExtendProgram
+
+Verified on mainnet with real funds. Extending by 10,240 bytes:
+
+```
+before   Data Length: 174,112   balance 0.18168446
+after    Data Length: 184,352   balance 0.11039036
+```
+
+Cost: 0.0713 XNT — exactly 10,240 × 6,960 lamports, which also confirms the rent
+formula to the lamport. So the repair strategy is viable on X1, not just on
+Solana.
+
+**Prefer avoiding the failure entirely.** `solana program deploy --max-len`
+pre-allocates headroom on the *first* deploy, so later redeploys fit without an
+extend round trip. It costs the extra rent up front (15KB ≈ 0.104 XNT) instead
+of at repair time. Worth it for any program you expect to iterate on.
+
 The extend/retry recovery itself is covered by
 `scripts/test-deploy-recovery.mjs`, which drives a fake `solana` binary through
 the failure rather than spending real rent.
@@ -193,8 +211,9 @@ Against X1 mainnet, October 2026:
 | `x1 deploy --cluster mainnet` | program `89bFvUeVuk9sCGZJeDAtZFh6pYYS24UbZKRpY7863PiS` |
 | Rent charged | 1.2127 XNT (1.4 → 0.1817, incl. fees) |
 | On-chain verification | executable, authority set, 174,157-byte allocation |
+| `ExtendProgram` on X1 | **works** — 174,112 → 184,352 bytes for 0.0713 XNT |
 | Redeploy | refused by pre-flight: needs buffer rent, see #10 |
-| Extend/retry recovery | verified against a fake `solana` binary, no chain spend |
+| Extend/retry recovery | orchestration verified against a fake `solana` binary |
 
 ## 11. WSL2 gotchas (Windows)
 

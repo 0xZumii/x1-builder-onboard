@@ -172,8 +172,9 @@ Build and deploy verified end to end on **X1 mainnet**:
   (see `docs/findings.md` #7); the kit passes it automatically
 
 Not yet exercised: a real on-chain **upgrade**, because a redeploy needs ~2x
-rent for the buffer account (`docs/findings.md` #10). The extend/retry recovery
-logic itself is covered by `scripts/test-deploy-recovery.mjs`.
+rent for the buffer account (`docs/findings.md` #10). `ExtendProgram` itself is
+confirmed working on X1 mainnet (174,112 → 184,352 bytes for 0.0713 XNT), and
+the extend/retry orchestration is covered by `scripts/test-deploy-recovery.mjs`.
 
 ## Layout
 
