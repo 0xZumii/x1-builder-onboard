@@ -216,7 +216,6 @@ Against X1 mainnet, October 2026:
 | Extend/retry recovery | orchestration verified against a fake `solana` binary |
 
 ## 11. WSL2 gotchas (Windows)
-
 Two things cost real time and are easy to avoid:
 
 1. **Ubuntu's `.bashrc` returns early for non-interactive shells.** Anything
@@ -228,3 +227,29 @@ Two things cost real time and are easy to avoid:
 
 Also: keep Anchor projects on the Linux filesystem (`~/project`), not
 `/mnt/c/...`. Cargo and the SBF compiler are drastically slower over 9p.
+
+## 12. Local development works, and sidesteps the faucet entirely
+
+`solana-test-validator` can clone X1's programs straight from mainnet:
+
+```sh
+solana-test-validator --url https://rpc.mainnet.x1.xyz --reset \
+  --clone-upgradeable-program metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s \
+  --clone ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+```
+
+Measured: RPC ready in **~5s**, and all seven standard programs
+(SPL Token, Token-2022, Token Metadata, Core, Squads v4, ATA, Memo) present and
+executable.
+
+Two things matter:
+
+- Use `--clone-upgradeable-program` for anything owned by
+  `BPFLoaderUpgradeab1e…`. Those accounts are 36-byte stubs; the code lives in
+  ProgramData, and a plain `--clone` copies only the stub.
+- X1 deployed SPL Token and Token-2022 as **upgradeable**, unlike mainnet-beta,
+  so they need the upgradeable variant too.
+
+The local validator runs its own faucet, so `solana airdrop` works even while
+the public testnet faucet is broken (#4). For day-to-day iteration that is
+faster and more reliable than the public cluster. `x1 localnet` wraps it.

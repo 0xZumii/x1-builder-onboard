@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 
 import { Keypair, PublicKey } from "@solana/web3.js";
 
-import { NATIVE_SYMBOL, resolveCluster, type ClusterInput } from "./constants.js";
+import { CLUSTERS, LOCALNET_PROGRAMS, NATIVE_SYMBOL, resolveCluster, type ClusterInput } from "./constants.js";
 import { createX1Connection, formatXnt, getX1Status } from "./connection.js";
 import { expandHome, loadX1Config } from "./config.js";
 import { deployProgram } from "./deploy.js";
@@ -109,6 +111,7 @@ ${bold("COMMANDS")}
   doctor              Verify your toolchain, RPC and wallet before deploying
   status              Print chain info, latency and your rate-limit budget
   deploy              Build, deploy, and auto-extend the program account
+  localnet            Run a local validator with X1's programs cloned in
   faucet              Request testnet ${NATIVE_SYMBOL}
   balance             Show the balance of a wallet
   help                Show this message
@@ -125,11 +128,13 @@ ${bold("DEPLOY")}
   --so <path>            Path to the built .so
   --name <name>          Program name, used to find target/deploy/<name>.so
   --extend-by <bytes>    Growth per repair attempt (default: 15000)
+  --headroom <bytes>     Pre-allocate this much extra on first deploy (--max-len)
   --priority-fee <n>     Compute unit price in microlamports
   --dry-run              Print the deploy command without sending it
 
 ${bold("EXAMPLES")}
   ${dim("$")} x1 doctor
+  ${dim("$")} x1 localnet --reset
   ${dim("$")} x1 deploy --name my_program
   ${dim("$")} x1 faucet --amount 2
   ${dim("$")} x1 status --cluster mainnet
@@ -221,11 +226,17 @@ async function commandDeploy(flags: Record<string, string | boolean>): Promise<n
     programName: typeof flags.name === "string" ? flags.name : undefined,
     build: flags["no-build"] === true ? false : flags.build === true ? true : undefined,
     extendBy: typeof flags["extend-by"] === "string" ? Number(flags["extend-by"]) : undefined,
+    headroom: typeof flags.headroom === "string" ? Number(flags.headroom) : undefined,
     priorityFee:
       typeof flags["priority-fee"] === "string" ? Number(flags["priority-fee"]) : undefined,
     dryRun: flags["dry-run"] === true,
     onLog: (line) => console.log(dim(`  ${line}`)),
   });
+
+  if (flags["dry-run"] === true) {
+    console.log(`\n  ${cyan("dry run")} — nothing was sent\n`);
+    return 0;
+  }
 
   console.log(`\n  ${green("✓")} program   ${result.programId}`);
   if (result.signature) console.log(`  ${green("✓")} signature ${result.signature}`);
@@ -280,6 +291,47 @@ async function commandBalance(flags: Record<string, string | boolean>): Promise<
   return 0;
 }
 
+async function commandLocalnet(flags: Record<string, string | boolean>): Promise<number> {
+  const port = typeof flags.port === "string" ? flags.port : "8899";
+  const source = typeof flags.url === "string" ? flags.url : CLUSTERS.mainnet.rpcUrl;
+  const ledger = typeof flags.ledger === "string" ? flags.ledger : path.join(os.homedir(), ".x1-localnet");
+
+  const args = ["--url", source, "--ledger", ledger, "--rpc-port", port, "--quiet"];
+  if (flags.reset === true) args.push("--reset");
+
+  const clone = flags["no-clone"] !== true;
+  if (clone) {
+    for (const program of LOCALNET_PROGRAMS.upgradeable) {
+      args.push("--clone-upgradeable-program", program.address);
+    }
+    for (const program of LOCALNET_PROGRAMS.plain) {
+      args.push("--clone", program.address);
+    }
+  }
+
+  console.log(`\n${bold("X1 localnet")}\n`);
+  console.log(`  rpc      ${cyan(`http://127.0.0.1:${port}`)}`);
+  console.log(`  ledger   ${ledger}`);
+  console.log(`  clones   ${clone ? `${LOCALNET_PROGRAMS.upgradeable.length + LOCALNET_PROGRAMS.plain.length} programs from ${source}` : "disabled"}`);
+  console.log(`\n  ${dim("Ctrl-C to stop")}\n`);
+
+  const child = spawn("solana-test-validator", args, { stdio: "inherit" });
+
+  child.on("error", (error) => {
+    console.error(red(`Could not start solana-test-validator: ${error.message}`));
+    console.error(dim("Install the Solana CLI, or run with --no-clone."));
+    process.exit(1);
+  });
+
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.on(signal, () => child.kill(signal));
+  }
+
+  return await new Promise<number>((resolve) => {
+    child.on("exit", (code) => resolve(code ?? 0));
+  });
+}
+
 async function main(): Promise<number> {
   const { command, flags } = parseArgs(process.argv.slice(2));
 
@@ -295,6 +347,8 @@ async function main(): Promise<number> {
         return await commandFaucet(flags);
       case "balance":
         return await commandBalance(flags);
+      case "localnet":
+        return await commandLocalnet(flags);
       case "help":
       case "--help":
       case "-h":

@@ -135,6 +135,28 @@ export const NATIVE_SYMBOL = "XNT";
 export const DECIMALS = 9;
 export const LAMPORTS_PER_XNT = 1_000_000_000;
 
+/**
+ * Programs cloned into a local validator so a local cluster behaves like X1
+ * for the things developers actually reach for.
+ *
+ * The upgradeable ones expose a 36-byte program account; their code lives in a
+ * ProgramData account, so they need `--clone-upgradeable-program`. A plain
+ * `--clone` only copies the stub.
+ */
+export const LOCALNET_PROGRAMS = {
+  upgradeable: [
+    { name: "SPL Token", address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+    { name: "Token-2022", address: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" },
+    { name: "Token Metadata", address: "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" },
+    { name: "Metaplex Core", address: "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d" },
+    { name: "Squads v4", address: "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf" },
+  ],
+  plain: [
+    { name: "Associated Token", address: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" },
+    { name: "Memo", address: "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr" },
+  ],
+} as const;
+
 export type ClusterInput =
   | ClusterName
   | string

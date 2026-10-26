@@ -79,6 +79,20 @@ fails with `Platform tools v1.52 is incompatible with SBPFv3`. The kit builds
 with `anchor build --no-idl -- --arch v0` and regenerates the IDL separately.
 On older clients it uses a plain `anchor build`.
 
+### Prefer headroom over repair
+
+```ts
+await deployProgram({ ..., headroom: 15_000 });
+```
+
+passes `--max-len`, so the program is created with room to grow and a later
+redeploy never fails with `account data too small` in the first place. It costs
+the extra rent up front (~0.104 XNT per 15KB) rather than at repair time, and is
+ignored on upgrades since the account already exists.
+
+The repair path still exists for programs deployed without headroom, and is
+covered by `scripts/test-deploy-recovery.mjs`.
+
 ## Doctor
 
 ```ts
@@ -152,3 +166,16 @@ CLUSTERS.testnet.faucetUrl; // https://faucet.testnet.x1.xyz
 
 explorerTxUrl(CLUSTERS.mainnet, signature);
 ```
+
+## Local validator
+
+`x1 localnet` starts `solana-test-validator` with X1's programs cloned from
+mainnet, so you can iterate without touching the public cluster:
+
+```sh
+x1 localnet --reset
+solana -u http://127.0.0.1:8899 airdrop 5
+```
+
+`LOCALNET_PROGRAMS` exports the address list if you want to build your own
+invocation.

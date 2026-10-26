@@ -126,6 +126,7 @@ mount.
 x1 doctor              Verify toolchain, RPC, rate limits and wallet
 x1 status              Chain info, latency, live rate-limit budget
 x1 deploy              Build, deploy, auto-extend
+x1 localnet            Local validator with X1's programs cloned in
 x1 faucet              Request testnet XNT
 x1 balance             Show a wallet balance
 ```
@@ -134,6 +135,30 @@ x1 balance             Show a wallet balance
 npx x1 doctor
 npx x1 deploy --name my_program
 ```
+
+## Local development
+
+```sh
+x1 localnet --reset
+```
+
+Boots `solana-test-validator` with X1's standard programs cloned from mainnet —
+SPL Token, Token-2022, Token Metadata, Metaplex Core, Squads v4, Associated
+Token and Memo. Verified: RPC ready in ~5s, all seven present and executable.
+
+Because the clone source is the real cluster, those are X1's actual bytecode
+rather than Solana's. Point a project at it with `cluster: "localnet"` in
+`x1.config.ts`.
+
+It also sidesteps the testnet faucet outage — the local validator runs its own
+faucet:
+
+```sh
+solana -u http://127.0.0.1:8899 airdrop 5
+```
+
+No Docker required. `--no-clone` gives a bare validator; `--port` and `--ledger`
+allow parallel stacks.
 
 ## Scaffolding a project
 
@@ -161,7 +186,7 @@ against X1.
 | --- | --- | --- |
 | 1 | `@x1/kit` — connection, throttle, deploy, doctor | working, verified on Windows and Linux against live X1 |
 | 2 | `create-x1-dapp` scaffolder | working, tested end to end in WSL |
-| 3 | Local validator stack (Docker, cloned programs) | research |
+| 3 | Local validator with X1 programs cloned | **working** — `x1 localnet`, ~5s boot, 7 programs |
 | 4 | Explorer plugin / docs PR | planned |
 
 Build and deploy verified end to end on **X1 mainnet**:

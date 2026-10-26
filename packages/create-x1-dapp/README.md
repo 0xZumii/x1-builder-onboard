@@ -37,7 +37,7 @@ from the official docs:
 | --- | --- |
 | `Platform tools v1.52 is incompatible with SBPFv3` | `npm run build` uses `--arch v0` |
 | Anchor exits non-zero after a successful build | `--no-idl` on the build, separate `npm run idl` |
-| `account data too small` on redeploy | `deployProgram` extends and retries |
+| `account data too small` on redeploy | `headroom: 15_000` pre-allocates via `--max-len`, with extend-and-retry as backup |
 | Cryptic rent failures | deploy estimates cost and refuses before sending |
 | Redeploy needs 2x rent (buffer account) | pre-flight reports it in XNT, not lamports |
 

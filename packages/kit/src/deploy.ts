@@ -23,6 +23,14 @@ export interface DeployOptions {
   extendBy?: number;
   maxExtendAttempts?: number;
   priorityFee?: number | "auto";
+  /**
+   * Extra bytes to allocate on the *first* deploy, via `--max-len`.
+   *
+   * This is prevention instead of repair: the program is born with room to
+   * grow, so later redeploys fit and never hit "account data too small".
+   * Costs the extra rent up front (≈0.104 XNT per 15KB). Ignored on upgrades.
+   */
+  headroom?: number;
   /** Skip the pre-flight balance check (not recommended). */
   skipBalanceCheck?: boolean;
   cwd?: string;
@@ -207,6 +215,7 @@ function deployArgs(
   soPath: string,
   programId: string,
   programKeypairPath?: string,
+  maxLen?: number,
 ): string[] {
   const args = [
     "program",
@@ -221,6 +230,10 @@ function deployArgs(
     "--program-id",
     programKeypairPath ?? programId,
   ];
+
+  if (maxLen && maxLen > 0) {
+    args.push("--max-len", String(maxLen));
+  }
 
   if (typeof options.priorityFee === "number" && options.priorityFee > 0) {
     args.push("--with-compute-unit-price", String(Math.floor(options.priorityFee)));
@@ -311,16 +324,28 @@ export async function deployProgram(options: DeployOptions): Promise<DeployResul
   }
 
   const soBytes = (await stat(soPath)).size;
-  const estimate = await estimateDeployCost(options.connection, programId, soBytes);
+  const headroom = Math.max(0, options.headroom ?? 0);
+  let estimate = await estimateDeployCost(options.connection, programId, soBytes);
+
+  // `--max-len` only sizes a newly created account, so headroom is meaningless
+  // on an upgrade (the account already exists). Charge the extra rent to the
+  // estimate so the pre-flight check stays honest.
+  const maxLen = !estimate.isUpgrade && headroom > 0 ? soBytes + headroom : undefined;
+  if (maxLen) {
+    const bytes = maxLen;
+    const rent = rentExemptLamports(bytes);
+    estimate = { ...estimate, soBytes: bytes, rentLamports: rent, requiredLamports: rent };
+  }
 
   log(
     `${estimate.isUpgrade ? "upgrade" : "first deploy"} · ${soBytes} bytes · ` +
       `rent ${xnt(estimate.rentLamports)}` +
+      (maxLen ? ` (+${headroom} headroom)` : "") +
       (estimate.isUpgrade ? ` + buffer ${xnt(estimate.bufferLamports)} (refunded)` : ""),
   );
 
   if (options.dryRun) {
-    log(`[dry-run] solana ${deployArgs(options, soPath, programId, programKeypairPath).join(" ")}`);
+    log(`[dry-run] solana ${deployArgs(options, soPath, programId, programKeypairPath, maxLen).join(" ")}`);
     log(`[dry-run] required balance: ${xnt(estimate.requiredLamports)}`);
     return { programId, soPath, extendedBytes: 0, extendAttempts: 0, built };
   }
@@ -348,9 +373,16 @@ export async function deployProgram(options: DeployOptions): Promise<DeployResul
   let extendedBytes = 0;
   let extendAttempts = 0;
   let lastResult: RunResult | null = null;
+  let allowMaxLen = maxLen !== undefined;
 
-  for (let attempt = 0; attempt <= maxExtendAttempts; attempt += 1) {
-    const args = deployArgs(options, soPath, programId, programKeypairPath);
+  while (extendAttempts <= maxExtendAttempts) {
+    const args = deployArgs(
+      options,
+      soPath,
+      programId,
+      programKeypairPath,
+      allowMaxLen ? maxLen : undefined,
+    );
     log(`$ solana ${args.join(" ")}`);
 
     const result = await run("solana", args, { cwd });
@@ -363,7 +395,15 @@ export async function deployProgram(options: DeployOptions): Promise<DeployResul
       return { programId, soPath, signature, extendedBytes, extendAttempts, built };
     }
 
-    if (!needsExtend(output) || attempt === maxExtendAttempts) break;
+    // Not every CLI accepts --max-len. Drop it and try again before treating
+    // this as a real failure; costs one extra attempt at most.
+    if (allowMaxLen && /(unknown|unexpected|unrecognized).*argument|invalid value/i.test(output)) {
+      log("--max-len was rejected by this CLI; retrying without pre-allocation");
+      allowMaxLen = false;
+      continue;
+    }
+
+    if (!needsExtend(output) || extendAttempts >= maxExtendAttempts) break;
 
     extendAttempts += 1;
 
@@ -372,8 +412,7 @@ export async function deployProgram(options: DeployOptions): Promise<DeployResul
     let growBy = extendBy;
     const allocation = await getProgramAllocation(options.connection, programId).catch(() => null);
     if (allocation !== null) {
-      const { stat: statFile } = await import("node:fs/promises");
-      const binarySize = (await statFile(soPath)).size;
+      const binarySize = (await stat(soPath)).size;
       const shortfall = binarySize - allocation;
       if (shortfall > 0) growBy = Math.max(extendBy, Math.ceil(shortfall / 1024) * 1024 + 4_096);
     }
