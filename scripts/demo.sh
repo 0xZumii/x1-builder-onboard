@@ -12,7 +12,13 @@ source "$HOME/devkit/scripts/wsl-env.sh" 2>/dev/null || true
 REPO="$HOME/devkit"
 APP="$HOME/x1-demo"
 RPC="http://127.0.0.1:8899"
-PORT=5173
+
+# Not 5173: that is Vite's default and the first thing another project grabs.
+PORT="${X1_DEMO_PORT:-5199}"
+for _ in $(seq 1 20); do
+  if ! (echo >"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then break; fi
+  PORT=$((PORT + 1))
+done
 
 LOCALNET_PID=""
 VITE_PID=""
@@ -86,14 +92,20 @@ fi
 tail -5 "$HOME/x1-demo-deploy.log"
 
 # ---------------------------------------------------------------- web
-echo "==> starting the web UI"
+echo "==> starting the web UI on port $PORT"
 cd "$APP" || exit 1
-npm run dev >"$HOME/x1-demo-vite.log" 2>&1 &
+npm run dev -- --port "$PORT" --strictPort >"$HOME/x1-demo-vite.log" 2>&1 &
 VITE_PID=$!
 
 if ! wait_for "http://127.0.0.1:$PORT" 60; then
   echo "    vite did not start; see ~/x1-demo-vite.log"
   tail -20 "$HOME/x1-demo-vite.log"
+  exit 1
+fi
+
+# Make sure we are looking at our page and not something else on that port.
+if ! curl -s "http://127.0.0.1:$PORT" | grep -q "x1-demo"; then
+  echo "    port $PORT is serving something else; try X1_DEMO_PORT=5300 bash scripts/demo.sh"
   exit 1
 fi
 
