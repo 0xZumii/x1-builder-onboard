@@ -253,3 +253,26 @@ Two things matter:
 The local validator runs its own faucet, so `solana airdrop` works even while
 the public testnet faucet is broken (#4). For day-to-day iteration that is
 faster and more reliable than the public cluster. `x1 localnet` wraps it.
+
+## 13. A local validator needs the cluster's feature set
+
+A program that deploys to X1 mainnet can be rejected by a local
+`solana-test-validator`:
+
+```
+Error: Deploying program failed: RPC response error -32002: Transaction simulation failed:
+Error processing Instruction 1: invalid account data for instruction
+  Detected sbpf_version required by the executable which are not enabled
+  Program BPFLoaderUpgradeab1e11111111111111111111111111111 failed
+```
+
+Nothing is wrong with the binary — it is already running on mainnet. The local
+validator's genesis simply does not enable the SBPF version the executable
+targets. Clone the feature set along with the programs:
+
+```sh
+solana-test-validator --url https://rpc.mainnet.x1.xyz --clone-feature-set ...
+```
+
+`x1 localnet` does this by default. Without it, local deployment is guaranteed
+to fail for anything built with `--arch v0`.

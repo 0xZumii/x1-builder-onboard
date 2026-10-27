@@ -58,10 +58,22 @@ async function send(instructions, extraSigners = []) {
 
   for (const signer of extraSigners) tx.partialSign(signer);
 
-  const signed = await provider.signTransaction(tx);
-  const signature = await connection.sendRawTransaction(signed.serialize());
-  await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
-  return signature;
+  // Wallets differ: most expose signTransaction, some only
+  // signAndSendTransaction. Support both.
+  if (typeof provider.signTransaction === "function") {
+    const signed = await provider.signTransaction(tx);
+    const signature = await connection.sendRawTransaction(signed.serialize());
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+    return signature;
+  }
+
+  if (typeof provider.signAndSendTransaction === "function") {
+    const { signature } = await provider.signAndSendTransaction(tx);
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+    return signature;
+  }
+
+  throw new Error("Wallet exposes neither signTransaction nor signAndSendTransaction");
 }
 
 function render() {

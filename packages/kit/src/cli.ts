@@ -418,6 +418,11 @@ async function commandLocalnet(flags: Record<string, string | boolean>): Promise
 
   const clone = flags["no-clone"] !== true;
   if (clone) {
+    // Copy the source cluster's feature set as well as its programs. Without
+    // this the local genesis may not enable the SBPF version a program was
+    // built for, and deploying fails with:
+    //   "Detected sbpf_version required by the executable which are not enabled"
+    args.push("--clone-feature-set");
     for (const program of LOCALNET_PROGRAMS.upgradeable) {
       args.push("--clone-upgradeable-program", program.address);
     }

@@ -4,6 +4,9 @@ This is the shortest path from nothing to a program running on X1. Every
 command here has been run on a clean machine; the expected output is included so
 you can tell when something is wrong.
 
+> **In a hurry?** `bash scripts/demo.sh` does steps 1–6 automatically against a
+> local validator and opens a web UI. This guide explains what it is doing.
+
 Two of the steps exist because of traps that are not documented anywhere else
 (see [`findings.md`](findings.md)): the Anchor build needs an extra flag on
 current Solana clients, and the testnet faucet is currently down.
@@ -11,7 +14,6 @@ current Solana clients, and the testnet faucet is currently down.
 ---
 
 ## 0. Prerequisites
-
 | | |
 | --- | --- |
 | **Windows** | WSL2. There is no native Windows build of Solana or Anchor. |

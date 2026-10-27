@@ -6,6 +6,16 @@ Developer toolkit for the [X1](https://x1.xyz) SVM blockchain.
 deployed program in seven steps — including what to do while the testnet faucet
 is down.
 
+**Just want to see it work?** From WSL or Linux, with the toolchain installed:
+
+```sh
+bash scripts/demo.sh
+```
+
+It boots a local validator, scaffolds a program, builds it, deploys it, and
+serves a web UI at <http://localhost:5173> — about four minutes, mostly
+compiling. Nothing touches a public network and no XNT is spent.
+
 X1 is fully Solana-VM compatible, so `@solana/web3.js`, Anchor and Metaplex all
 work unchanged. What is *not* unchanged is the network's behaviour under load —
 and that is what this kit handles.

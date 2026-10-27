@@ -22,6 +22,7 @@ const green = paint("32");
 const cyan = paint("36");
 
 const CLUSTERS: Record<string, string> = {
+  localnet: "http://127.0.0.1:8899",
   testnet: "https://rpc.testnet.x1.xyz",
   mainnet: "https://rpc.mainnet.x1.xyz",
 };
@@ -303,12 +304,12 @@ const packageJson = (pkg: string, kitDep: string, template: "web" | "basic"): st
   return JSON.stringify(manifest, null, 2) + "\n";
 };
 
-const x1Config = (program: string): string =>
+const x1Config = (program: string, cluster: string): string =>
   [
     'import { defineConfig } from "@x1/kit";',
     "",
     "export default defineConfig({",
-    '  cluster: "testnet",',
+    `  cluster: "${cluster}",`,
     '  wallet: "~/.config/solana/id.json",',
     "  program: {",
     `    name: "${program}",`,
@@ -555,7 +556,7 @@ async function main(): Promise<void> {
     "Anchor.toml": anchorToml(program, programId, rpc),
     "Cargo.toml": workspaceCargo(),
     "package.json": packageJson(pkg, kitDep, options.template),
-    "x1.config.ts": x1Config(program),
+    "x1.config.ts": x1Config(program, clusterLabel),
     "README.md": readme(pkg, program, clusterLabel, options.template),
     ".gitignore": gitignore(),
     "scripts/deploy.mjs": deployScript(program),
